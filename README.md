@@ -47,5 +47,5 @@ For example in file /etc/R/Rprofile.site:
 
 # TODO
 
-* Handle the quit(save="no"), at this time, it always save workspace. As workaround, I had saveWorkspace function to set the choosen behavior.
+* Handle the quit(save="no"), at this time, it always save workspace. As workaround, I add saveWorkspace function to set the choosen behavior.
 
