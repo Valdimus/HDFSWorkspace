@@ -1,0 +1,80 @@
+loadWorkspaceHDFS <- function(filename="Rdata") {
+message ("Chargement workspace depuis HDFS")
+# Recuperation de la taille du fichier workspace
+# pour permettre a pv d'afficher la progression
+du_output = system(paste("hdfs dfs -du",filename), intern = TRUE)
+workspace_size = strsplit(du_output, " ")[[1]][1]
+con <- pipe(paste("hdfs dfs -cat",filename,"| pv --size",workspace_size), "rb")
+load(envir=.GlobalEnv, file = con)
+close(con)
+}
+saveWorkspaceHDFS <- function(filename="Rdata") {
+message ("Sauvegarde workspace sur HDFS")
+tmp_filename = paste(filename, as.numeric(as.POSIXlt(Sys.time())), sep="-")
+# Estimation de la taille du workspace pour donner une idée de l'avancement
+# On ne prend pas en compte la compression donc la valeur est largement sur estimée
+workspace_size = sum(sapply(ls(envir=.GlobalEnv), function(x)object.size(get(x))))
+# FIXME : on utilise pas la taille estimee parce que si elle diffère de la
+# taille reelle, la barre de progression ne va pas jusqu'a 100%. Un utilisateur
+# va surement se dire que sa sauvegarde n'est pas complete
+# FIXME : Il faudrait ne pas sauver les fonctions de load/restore
+con <- pipe(paste("pv | hdfs dfs -put -",tmp_filename), "wb")
+save(list = ls(envir=.GlobalEnv, all.names = TRUE), file = con)
+close(con)
+system(paste("hdfs dfs -rm", filename), ignore.stderr = TRUE, ignore.stdout = TRUE, intern = TRUE)
+system(paste("hdfs dfs -mv", tmp_filename, filename))
+}
+titi <- "TOTO"
+saveWorkspaceHDFS()
+loadWorkspaceHDFS <- function(filename="Rdata") {
+message ("Chargement workspace depuis HDFS")
+# Recuperation de la taille du fichier workspace
+# pour permettre a pv d'afficher la progression
+du_output = system(paste("hdfs dfs -du",filename), intern = TRUE)
+workspace_size = strsplit(du_output, " ")[[1]][1]
+con <- pipe(paste("/opt/hadoop-3.0.0-alpha4/bin/hdfs dfs -cat",filename,"| pv --size",workspace_size), "rb")
+load(envir=.GlobalEnv, file = con)
+close(con)
+}
+saveWorkspaceHDFS <- function(filename="Rdata") {
+message ("Sauvegarde workspace sur HDFS")
+tmp_filename = paste(filename, as.numeric(as.POSIXlt(Sys.time())), sep="-")
+# Estimation de la taille du workspace pour donner une idée de l'avancement
+# On ne prend pas en compte la compression donc la valeur est largement sur estimée
+workspace_size = sum(sapply(ls(envir=.GlobalEnv), function(x)object.size(get(x))))
+# FIXME : on utilise pas la taille estimee parce que si elle diffère de la
+# taille reelle, la barre de progression ne va pas jusqu'a 100%. Un utilisateur
+# va surement se dire que sa sauvegarde n'est pas complete
+# FIXME : Il faudrait ne pas sauver les fonctions de load/restore
+con <- pipe(paste("pv | /opt/hadoop-3.0.0-alpha4/bin/hdfs dfs -put -",tmp_filename), "wb")
+save(list = ls(envir=.GlobalEnv, all.names = TRUE), file = con)
+close(con)
+system(paste("/opt/hadoop-3.0.0-alpha4/bin/hdfs dfs -rm", filename), ignore.stderr = TRUE, ignore.stdout = TRUE, intern = TRUE)
+system(paste("/opt/hadoop-3.0.0-alpha4/bin/hdfs dfs -mv", tmp_filename, filename))
+}
+saveWorkspaceHDFS()
+system('source ~/.bashrc')
+system('source ~/.profile')
+system('source /etc/profile.d/modules.sh')
+system('shopt -s expanded_aliases)
+''
+'
+system2()
+system2("hdfs dfs -ls")
+system2("echo 'Hello'")
+system("ls")
+system("source")
+system("/usr/bin/source")
+Sys.getenv(‘R_HOME’)
+Sys.getenv("R_HOME")
+system("echo $PATH")
+Sys.which(c("hdfs""))
+)
+""
+Sys.which(c("hdfs"))
+run <- function(command) {
+system(paste("/bin/bash -c", shQuote(command)))
+}
+run("hdfs dfs -ls")
+run("source ~/.bashrc")
+run("hdfs dfs -ls")
