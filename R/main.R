@@ -1,18 +1,23 @@
 # Author: Christophe NOUCHET
 # Email: nouchet.christophe@gmail.com
 # Date: 27/08/2017
-# How To Use: You must set HADOOP_HOME and HADOOP_BIN in your Renviron.site
+# Infomation: Thanks to Nicolas Dupeux for the POC that inspired this package, especially for the use of pv command
+# Documentation: This package is a simple way to save user workspace on HDFS instead of local disk. It's necessary if you have multiple R server than share their home on
+#                nfs (or something else) and you don't have that much free space.
 
-ELEMENT_TO_RM_FROM_ENV <- c("hadoop_command", "hdfs_command", "hdfs_dfs_command", "hdfs_ls", "readHDFSFile",
-                            "writeHDFSFile", "loadWorkspaceHDFS", "saveWorkspaceHDFS", "ELEMENT_TO_RM_FROM_ENV",
-                            "hdfs_mkdir", "getRDirName", "getProjectPath", "autoSaveWorkspaceHDFS", "autoLoadWorkspace", "fix_path")
 
-##' @name fix_path
-##' @description  Ok, file.path don't check if the path already have a '/' at the begining or end of parameters, so you can have double "/" ...
+#' @title A little fix for file.path
+#' @name fix_path
+#' @description  Ok, file.path don't check if the path already have a '/' at the start or end of parameters, so you can have double "/" ...
 fix_path <- function(path) {
   return(gsub("///", "/", gsub("//", "/", path)))
 }
 
+
+#' @title Get the R directory to use on HDFS
+#' @name getRDirName
+#' @description Get the path to use for creating HDFS tree
+#' @return string
 getRDirName <- function() {
   rdirname <- Sys.getenv("HADOOP_RDIRNAME")
   if(rdirname == ""){
@@ -21,75 +26,110 @@ getRDirName <- function() {
   return(rdirname)
 }
 
-##' @name loadWorkspaceHDFS
-##' @description Load Workspace from HDFS
-##' @param filename The filename to load on HDFS
-##' @return boolean
-loadWorkspaceHDFS <- function(filename) {
-  connection <- readHDFSFile(filename = filename)
-  if(connection == FALSE){
-    message("No Rdata found on HDFS")
-    return(FALSE)
-  }
-  message("Load Workspace from HDFS: ", filename)
-  load(envir=.GlobalEnv, file = connection)
-  message("Load Workspace from HDFS: OK")
-  close(connection)
-  return(TRUE)
-
+#' @title Don't save Workspace on HDFS
+#' @name saveWorkspace
+#' @description Don't save Workspace on HDFS
+#' @export
+saveWorkspace <- function(action="yes") {
+  Sys.setenv(HDFSWorkspace_SAVE=action)
 }
 
-##' @name saveWorkspaceHDFS
-##' @description Save your workspace on HDFS
-##' @param filename Path to the file on HDFS
-##' @return boolean
-saveWorkspaceHDFS <- function(filename) {
-  message("Save Workspace on HDFS: ", filename)
-  tmp_filename = paste(filename, as.numeric(as.POSIXlt(Sys.time())), sep="-")
-  connection <- writeHDFSFile(tmp_filename)
-  myenv <- ls(envir=.GlobalEnv, all.names = TRUE)
-
-  for(element in ELEMENT_TO_RM_FROM_ENV)
-  {
-    myenv <- myenv[myenv != element]
-  }
-
-  save(list = myenv, file = connection)
-
-  close(connection)
-  suppressWarnings(system(hdfs_dfs_command(paste("-rm", filename)), ignore.stderr = TRUE, ignore.stdout = TRUE, intern = TRUE))
-  suppressWarnings(system(hdfs_dfs_command(paste("-mv", tmp_filename, filename)), intern=TRUE, ignore.stderr = TRUE, ignore.stdout = TRUE))
-  message("Save Workspace on HDFS: OK")
-  rm(list=ls(envir=globalenv(), all.names = TRUE), envir = globalenv())
-  return(TRUE)
+#' @title Know if we have to save Workspace
+#' @name getSaveWorkspace
+#' @description Know if we have to save Workspace
+#' @export
+getSaveWorkspace <- function() {
+  return(substr(Sys.getenv("HDFSWorkspace_SAVE"), 0, 1) == "y")
 }
 
-
-##' @name getProjectPath
-##' @description Get the project path
-##' @return string
+#' @title Get the project path on HDFS
+#' @name getProjectPath
+#' @description Get the project path
+#' @return string
 getProjectPath <- function() {
 
   return(fix_path(file.path(getRDirName(), getwd())))
 }
 
-##' @name autoSaveWorkspaceHDFS
-##' @description Automaticely save the workspace on HDFS
-##' @return boolean
-autoSaveWorkspaceHDFS <- function()
-{
-  project_path <- getProjectPath()
+#' @title Load the workspace from HDFS
+#' @name loadWorkspaceHDFS
+#' @description Load Workspace from HDFS
+#' @param filename The filename to load on HDFS. If null, filname will be getwd() + "/.RData".
+#' @return boolean
+#' @export
+loadWorkspaceHDFS <- function(filename = NULL) {
+  saveWorkspace(action="yes")
 
-  #Create the directory
-  hdfs_mkdir(project_path)
+  # Auto name
+  if(is.null(filename) && file.exists(fix_path(file.path(getwd(), ".RDataHDFS")))) {
+    filename <- fix_path(file.path(getProjectPath(), ".RData"))
+  }
+  else {
+    return(FALSE)
+  }
 
-  # SaveWorkspace
-  return(saveWorkspaceHDFS(fix_path(file.path(project_path, ".Rdata"))))
+  # Get the file on HDFS
+  connection <- readHDFSFile(filename = filename)
+
+  if(connection == FALSE){
+    message("No Workspace load from HDFS")
+    return(FALSE)
+  }
+
+  message("Load Workspace from HDFS: ", filename)
+
+  # Read it and populate user workspace
+  load(envir=.GlobalEnv, file = connection)
+  close(connection)
+
+  message("Load Workspace from HDFS: OK")
+
+  return(TRUE)
 }
 
-##' @name autoLoadWorkspace
-##' @description Automaticely load the workspace from HDFS
-autoLoadWorkspace <- function() {
-  project_path <- fix_path(file.path(getProjectPath(), ".Rdata"))
-  return(loadWorkspaceHDFS(project_path))
+#' @title Save Workspace on HDFS
+#' @name saveWorkspaceHDFS
+#' @description Save your workspace on HDFS
+#' @param filename Path to the file on HDFS. If null, filname will be getwd() + "/.RData".
+#' @return boolean
+#' @export
+saveWorkspaceHDFS <- function(filename = NULL) {
+
+  if(!getSaveWorkspace()){
+    return(FALSE)
+  }
+
+  # Auto name
+  if(is.null(filename)) {
+    project_path <- getProjectPath()
+
+    #Create the directory
+    hdfs_mkdir(project_path)
+
+    # SaveWorkspace
+    filename <- fix_path(file.path(project_path, ".RData"))
+  }
+
+  message("Save Workspace on HDFS: ", filename)
+
+  # We write the file on a temp_file for more safety (if the write failed, you don't loose the previous one)
+  tmp_filename = paste(filename, as.numeric(as.POSIXlt(Sys.time())), sep="-")
+
+  # Write file on HDFS
+  connection <- writeHDFSFile(tmp_filename)
+  save(list = ls(envir=.GlobalEnv, all.names = TRUE), file = connection)
+  close(connection)
+
+  # Delete old file and move the new one
+  suppressWarnings(system(hdfs_dfs_command(paste("-rm", filename)), ignore.stderr = TRUE, ignore.stdout = TRUE, intern = TRUE))
+  suppressWarnings(system(hdfs_dfs_command(paste("-mv", tmp_filename, filename)), intern=TRUE, ignore.stderr = TRUE, ignore.stdout = TRUE))
+
+  message("Save Workspace on HDFS: OK")
+
+  file.create(".RDataHDFS")
+
+  # Clean user workspace as we want that R only save it on HDFS
+  rm(list=ls(envir=globalenv(), all.names = TRUE), envir = globalenv())
+
+  return(TRUE)
 }
