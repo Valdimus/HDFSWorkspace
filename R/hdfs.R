@@ -75,7 +75,7 @@ readHDFSFile <- function(filename, options="rb") {
     file_size <- hdfs_files[[filename]]
 
     # Use pv to have the progress of the loading
-    connection <- pipe(paste(hdfs_dfs_command(paste("-cat",filename, sep=" ")),"| pv --size",file_size, sep=" "), options)
+    connection <- pipe(paste(hdfs_dfs_command(paste("-cat",filename, sep=" ")),"| pv --format '%N %b %t %r %p %e\n' --force --size",file_size, sep=" "), options)
 
     return(connection)
   }
@@ -92,7 +92,7 @@ readHDFSFile <- function(filename, options="rb") {
 #' @param options File mode
 #' @return A file object that you can use with save
 writeHDFSFile <- function(filename, options="wb") {
-  connection <- pipe(paste("pv |", hdfs_dfs_command("-put -"),filename, sep=" "), options)
+  connection <- pipe(paste("pv --format '%N %b %t %r %p %e\n' --force |", hdfs_dfs_command("-put -"),filename, sep=" "), options)
   return(connection)
 }
 

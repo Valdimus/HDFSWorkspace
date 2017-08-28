@@ -1,7 +1,7 @@
 Package: HDFSWorkspace
 Type: Package
 Title: R Workspace on HDFS
-Version: 0.1.0
+Version: 0.1.1
 Author: Christophe NOUCHET
 Maintainer: Christophe NOUCHET <nouchet.christophe@gmail.com>
 Description: Store your workspace on HDFS instead of local disk.

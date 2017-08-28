@@ -27,18 +27,18 @@ getRDirName <- function() {
 }
 
 #' @title Don't save Workspace on HDFS
-#' @name saveWorkspace
+#' @name setSavedWorkspace
 #' @description Don't save Workspace on HDFS
 #' @export
-saveWorkspace <- function(action="yes") {
+setSavedWorkspace <- function(action="yes") {
   Sys.setenv(HDFSWorkspace_SAVE=action)
 }
 
 #' @title Know if we have to save Workspace
-#' @name getSaveWorkspace
+#' @name getSavedWorkspace
 #' @description Know if we have to save Workspace
 #' @export
-getSaveWorkspace <- function() {
+getSavedWorkspace <- function() {
   return(substr(Sys.getenv("HDFSWorkspace_SAVE"), 0, 1) == "y")
 }
 
@@ -58,7 +58,7 @@ getProjectPath <- function() {
 #' @return boolean
 #' @export
 loadWorkspaceHDFS <- function(filename = NULL) {
-  saveWorkspace(action="yes")
+  setSavedWorkspace(action="yes")
 
   # Auto name
   if(is.null(filename) && file.exists(fix_path(file.path(getwd(), ".RDataHDFS")))) {
@@ -95,7 +95,7 @@ loadWorkspaceHDFS <- function(filename = NULL) {
 #' @export
 saveWorkspaceHDFS <- function(filename = NULL) {
 
-  if(!getSaveWorkspace()){
+  if(!getSavedWorkspace()){
     return(FALSE)
   }
 
@@ -121,7 +121,9 @@ saveWorkspaceHDFS <- function(filename = NULL) {
   close(connection)
 
   # Delete old file and move the new one
+  message("Move the .Rdata to his final place on HDFS: [1/2]")
   suppressWarnings(system(hdfs_dfs_command(paste("-rm", filename)), ignore.stderr = TRUE, ignore.stdout = TRUE, intern = TRUE))
+  message("Move the .Rdata to his final place on HDFS: [2/2]")
   suppressWarnings(system(hdfs_dfs_command(paste("-mv", tmp_filename, filename)), intern=TRUE, ignore.stderr = TRUE, ignore.stdout = TRUE))
 
   message("Save Workspace on HDFS: OK")
